@@ -14,7 +14,7 @@ services:
     volumes:
       - "./conf.d:/etc/mysql/conf.d:ro"
     profiles:
-    - mysql
+    - mysql # Docker起動時profileを指定すると、指定したprofileのみ起動する。profileを指定しない限り起動しない
   postgres:
     image: postgres:15.3
     ports:
@@ -24,4 +24,88 @@ services:
       - POSTGRES_USER=petclinic
       - POSTGRES_DB=petclinic
     profiles:
-    - postgres
+    - postgres # Docker起動時profileを指定すると、指定したprofileのみ起動する。profileを指定しない限り起動しない
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml
+    ports:
+      - 1888:1888 # pprof extension
+      - 8888:8888 # Prometheus metrics exposed by the Collector
+      - 8889:8889 # Prometheus exporter metrics
+      - 13133:13133 # health_check extension
+      - 4317:4317 # OTLP gRPC receiver
+      - 4319:4318 # OTLP http receiver // 4318はjaegerのポートとかぶるので、4319に変更
+      - 55679:55679 # zpages extension
+  jaeger:
+    image: jaegertracing/all-in-one:1.50
+    ports:
+      - 6831:6831/udp
+      - 6832:6832/udp
+      - 5778:5778
+      - 16686:16686
+      - 4317:4317
+      - 4318:4318
+      - 14250:14250
+      - 14268:14268
+      - 14269:14269
+      - 9411:9411
+  loki:
+    image: grafana/loki:2.9.0
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - loki
+  prometheus:
+    image: prom/prometheus:v2.30.3
+    ports:
+      - "9090:9090"
+    # volumes:
+    #   - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    command:
+      # - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=1d
+      - --enable-feature=remote-write-receiver
+      - --enable-feature=exemplar-storage
+      - --web.enable-lifecycle
+    networks:
+      - loki
+  grafana:
+    environment:
+      - GF_PATHS_PROVISIONING=/etc/grafana/provisioning
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+    entrypoint:
+      - sh
+      - -euc
+      - |
+        mkdir -p /etc/grafana/provisioning/datasources
+        cat <<EOF > /etc/grafana/provisioning/datasources/ds.yaml
+        apiVersion: 1
+        datasources:
+        - name: Loki
+          type: loki
+          access: proxy
+          orgId: 1
+          url: http://loki:3100
+          basicAuth: false
+          isDefault: true
+          version: 1
+          editable: false
+        - name: Prometheus
+          type: prometheus
+          access: proxy
+          orgId: 1
+          url: http://prometheus:9090
+          basicAuth: false
+          isDefault: true
+          version: 1
+          editable: false
+        EOF
+        /run.sh
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    networks:
+      - loki
