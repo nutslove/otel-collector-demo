@@ -16,6 +16,10 @@ receivers:
       http:
         endpoint: 0.0.0.0:4318
 
+  # FluentD or Fluent Bit receiver
+  fluentforward:
+    endpoint: 0.0.0.0:8006
+
   # Collect own metrics
   prometheus:
     config:
@@ -24,6 +28,10 @@ receivers:
         scrape_interval: 10s
         static_configs:
         - targets: ['localhost:8888']
+      - job_name: 'java-server-node-exporter'
+        scrape_interval: 10s
+        static_configs:
+        - targets: ['10.111.1.236:9100']
 
 processors:
   batch:
@@ -32,13 +40,26 @@ exporters:
   logging:
     verbosity: detailed
   otlp:
-    # endpoint: https://otlp.nr-data.net:4317
-    # headers:
-    #   api-key: ${NEW_RELIC_LICENSE_KEY}
-    endpoint: http://localhost:4318
+    endpoint: https://otlp.nr-data.net:4318
+    headers:
+      api-key: ${NEW_RELIC_LICENSE_KEY}
+    #endpoint: http://10.111.2.4:4317
+    #tls:
+      #insecure: true
+  loki:
+    endpoint: http://10.111.2.4:3100/loki/api/v1/push
+    default_labels_enabled:
+      exporter: false
+      job: true
+
+  prometheusremotewrite:
+    endpoint: "https://10.111.2.4:9090/api/v1/push"
+    external_labels:
+      system: otel_demo
+    resource_to_telemetry_conversion:
+      enabled: true # Convert resource attributes to metric labels
 
 service:
-
   pipelines:
 
     traces:
@@ -52,8 +73,7 @@ service:
       exporters: [otlp, logging]
 
     logs:
-      receivers: [otlp]
+      receivers: [otlp, fluentforward]
       processors: [batch]
-        #exporters: [otlp, logging]
-      exporters: [logging]
+      exporters: [otlp, logging, loki]
   extensions: [health_check, pprof, zpages]
