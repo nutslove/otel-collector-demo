@@ -80,4 +80,4 @@
 - 
 
 - Docker ComposeでOpentelemetry Collector、Jaager、Prometheus、Loki、Grafanaを起動する
-  - `docker-compose up -d -f docker-compose.yml`
+  - `docker-compose up -d`
