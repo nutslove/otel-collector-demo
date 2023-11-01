@@ -53,8 +53,9 @@ exporters:
     tls:
       insecure: true
     default_labels_enabled:
-      exporter: false
+      exporter: true
       job: true
+      instance: true
   prometheusremotewrite:
     endpoint: http://10.111.2.4:9009/api/v1/push
     tls:
