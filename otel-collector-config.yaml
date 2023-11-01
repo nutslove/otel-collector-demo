@@ -40,40 +40,51 @@ exporters:
   logging:
     verbosity: detailed
   otlp:
+    #### New Relic
     endpoint: https://otlp.nr-data.net:4318
     headers:
       api-key: ${NEW_RELIC_LICENSE_KEY}
+    #### Jaeger
     #endpoint: http://10.111.2.4:4317
     #tls:
       #insecure: true
   loki:
     endpoint: http://10.111.2.4:3100/loki/api/v1/push
+    tls:
+      insecure: true
     default_labels_enabled:
       exporter: false
       job: true
-
   prometheusremotewrite:
-    endpoint: "https://10.111.2.4:9090/api/v1/push"
+    endpoint: http://10.111.2.4:9009/api/v1/push
+    tls:
+      insecure: true
     external_labels:
       system: otel_demo
-    resource_to_telemetry_conversion:
-      enabled: true # Convert resource attributes to metric labels
+  awsxray:
+  awsemf:
+    region: 'ap-northeast-1'
+  awscloudwatchlogs:
+    log_group_name: "from_otel_collector"
+    log_stream_name: "from_otel_collector_stream"
+    raw_log: true
+    region: 'ap-northeast-1'
+    tags: { 'source': 'otel' }
 
 service:
   pipelines:
-
     traces:
       receivers: [otlp]
       processors: [batch]
-      exporters: [otlp, logging]
+      exporters: [otlp, awsxray, logging]
 
     metrics:
       receivers: [otlp, prometheus]
       processors: [batch]
-      exporters: [otlp, logging]
+      exporters: [otlp, prometheusremotewrite, awsemf, logging]
 
     logs:
       receivers: [otlp, fluentforward]
       processors: [batch]
-      exporters: [otlp, logging, loki]
+      exporters: [otlp, loki, awscloudwatchlogs, logging]
   extensions: [health_check, pprof, zpages]

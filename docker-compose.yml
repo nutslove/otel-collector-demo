@@ -8,7 +8,7 @@ services:
       - 6832:6832/udp
       - 5778:5778
       - 16686:16686
-      - 4317:4317 # for opentelemetry grpc 
+      - 4317:4317 # for opentelemetry grpc
       - 4318:4318 # for opentelemetry http
       - 14250:14250
       - 14268:14268
@@ -21,18 +21,13 @@ services:
     volumes:
       - ./loki-config.yaml:/etc/loki/local-config.yaml
     command: -config.file=/etc/loki/local-config.yaml
-  prometheus:
-    image: prom/prometheus:v2.30.3
+  cortex:
+    image: cortexproject/cortex:master-cd2a035
     ports:
-      - "9090:9090"
+      - "9009:9009"
+    command: -config.file=/tmp/cortex.yml
     volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
-    command:
-      - --config.file=/etc/prometheus/prometheus.yml
-      - --storage.tsdb.retention.time=1d
-      - --enable-feature=remote-write-receiver
-      - --enable-feature=exemplar-storage
-      - --web.enable-lifecycle
+      - ./cortex.yml:/tmp/cortex.yml
   grafana:
     environment:
       - GF_PATHS_PROVISIONING=/etc/grafana/provisioning
@@ -55,13 +50,13 @@ services:
           isDefault: true
           version: 1
           editable: false
-        - name: Prometheus
+        - name: Cortex
           type: prometheus
           access: proxy
           orgId: 1
-          url: http://prometheus:9090
+          url: http://cortex:9009/prometheus
           basicAuth: false
-          isDefault: true
+          isDefault: false
           version: 1
           editable: false
         EOF
